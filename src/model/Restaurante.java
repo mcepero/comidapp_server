@@ -16,14 +16,16 @@ public class Restaurante {
     private String contrasena;
     private String email;
     private String direccion;
+    private String ciudad;
     private String telefono;
 
-    public Restaurante(int id, String usuario, String nombre, String email, String direccion, String telefono) {
+    public Restaurante(int id, String usuario, String nombre, String email, String direccion, String ciudad, String telefono) {
         this.id=id;
         this.usuario = usuario;
         this.nombre = nombre;
         this.email = email;
         this.direccion = direccion;
+        this.ciudad=ciudad;
         this.telefono = telefono;
     }
 
@@ -80,6 +82,14 @@ public class Restaurante {
         this.direccion = direccion;
     }
 
+    public String getCiudad() {
+        return ciudad;
+    }
+
+    public void setCiudad(String ciudad) {
+        this.ciudad = ciudad;
+    }
+    
     public String getTelefono() {
         return telefono;
     }

@@ -8,10 +8,14 @@ package servidor;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
@@ -70,7 +74,7 @@ public class HiloCliente extends Thread {
                         if (manejodb.iniciarSesionUsuario(args[1], args[2])) {
                             System.out.println("Ok...");
                             Cliente c = manejodb.obtenerClienteNombre(args[1]);
-                            salida.println(Mensajes.PETICION_LOGIN_CORRECTO+"--"+c.getId()+"--"+c.getEmail()+"--"+c.getNombre()+"--"+c.getDireccion());
+                            salida.println(Mensajes.PETICION_LOGIN_CORRECTO + "--" + c.getId() + "--" + c.getEmail() + "--" + c.getNombre() + "--" + c.getDireccion());
                         } else {
                             salida.println(Mensajes.PETICION_LOGIN_ERROR);
                             System.out.println("Error");
@@ -116,10 +120,12 @@ public class HiloCliente extends Thread {
                         salida.println(Mensajes.PETICION_MOSTRAR_CARTA_CORRECTO + "--" + listaProductos.size());
                         for (int i = 0; i < listaProductos.size(); i++) {
                             salida.println(Mensajes.PETICION_MOSTRAR_CARTA_CORRECTO + "--" + listaProductos.get(i).getNombre() + "--" + listaProductos.get(i).getIngredientes() + "--" + listaProductos.get(i).getPrecio() + "--" + listaProductos.get(i).getId());
+                           // enviarImagen(listaProductos.get(i).getImagen());                         
                         }
                         //Añadir un producto a la carta de un restaurante
                     } else if (flag.equals(Mensajes.PETICION_ANADIR_PRODUCTO)) {
-                        if (manejodb.anadirProducto(Integer.parseInt(args[1]), args[2], args[3], Double.parseDouble(args[4]))) {
+                        String nombreImagen = leerImagen(args[1], args[2]);
+                        if (manejodb.anadirProducto(Integer.parseInt(args[1]), args[2], args[3], Double.parseDouble(args[4]), nombreImagen)) {
                             salida.println(Mensajes.PETICION_ANADIR_PRODUCTO_CORRECTO);
                         } else {
                             salida.println(Mensajes.PETICION_ANADIR_PRODUCTO_ERROR);
@@ -168,9 +174,15 @@ public class HiloCliente extends Thread {
                         manejodb.eliminarRepartidor(Integer.parseInt(args[1]));
                         //COMPROBAR QUE SE ELIMINA
                         salida.println(Mensajes.PETICION_ELIMINAR_REPARTIDOR_CORRECTO);
-                    }else if (flag.equals("imagen")) {
-                        leerImagen();
-                        //salida.println(Mensajes.PETICION_ANADIR_PRODUCTO_CORRECTO);
+                    } else if (flag.equals(Mensajes.PETICION_MOSTRAR_RESTAURANTES)) {
+                        ArrayList<Restaurante> listaRestaurantes = manejodb.obtenerRestaurantes();
+                        salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaRestaurantes.size());
+                        for (int i = 0; i < listaRestaurantes.size(); i++) {
+                            salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaRestaurantes.get(i).getNombre() + "--" + listaRestaurantes.get(i).getEmail() + "--" + listaRestaurantes.get(i).getTelefono() + "--" + listaRestaurantes.get(i).getDireccion() + "--" + listaRestaurantes.get(i).getCiudad());
+                        }
+                    }else if(flag.equals(Mensajes.PETICION_FOTO_PRODUCTO)){
+                        Producto p = manejodb.obtenerProducto(Integer.parseInt(args[1]));
+                        enviarImagen(p.getImagen());
                     }
 
                 }
@@ -190,31 +202,54 @@ public class HiloCliente extends Thread {
         }
     }
 
-    public void leerImagen() {
-        DataInputStream dis = null;
+    public String leerImagen(String idRestaurante, String nombre) {
+        InputStream in = null;
+        OutputStream out = null;
+        ArrayList<Byte> bytesImagen = new ArrayList<>();
+        String nombreImagen = "";
         try {
-            dis = new DataInputStream(socket.getInputStream());
-            FileOutputStream fos = new FileOutputStream("testfile.jpg");
-            byte[] buffer = new byte[4096];
-            int filesize = 15123; // Send file size in separate msg
-            int read = 0;
-            int totalRead = 0;
-            int remaining = filesize;
-            while ((read = dis.read(buffer, 0, Math.min(buffer.length, remaining))) > 0) {
-                totalRead += read;
-                remaining -= read;
-                System.out.println("read " + totalRead + " bytes.");
-                fos.write(buffer, 0, read);
-            }   fos.close();
-            dis.close();
+            in = socket.getInputStream();
+            nombreImagen = nombre + idRestaurante + ".jpg";
+            out = new FileOutputStream("E:\\manuel\\Documents\\DAM\\2 DAM 2020\\Proyecto\\Servidor\\imagenescomida\\" + nombreImagen);
+            byte[] bytes = new byte[8096];
+
+            int count;
+            /*while ((count = in.read(bytes))>0) {
+                System.out.println(count);
+                System.out.println("!!!");
+                out.write(bytes, 0, count);
+            }*/
+
+            do {
+                count = in.read(bytes);
+                out.write(bytes, 0, count);
+            } while (count == 8096);
+
+            out.close();
+            /*in.close();*/
         } catch (IOException ex) {
             Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            try {
-                dis.close();
-            } catch (IOException ex) {
-                Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return nombreImagen;
+    }
+
+    public void enviarImagen(String imagen) {
+        FileInputStream in = null;
+        try {
+            byte[] bytes = new byte[8096];
+            in = new FileInputStream("E:\\manuel\\Documents\\DAM\\2 DAM 2020\\Proyecto\\Servidor\\imagenescomida\\"+imagen);
+            OutputStream out = socket.getOutputStream();
+            int count;
+            while ((count = in.read(bytes)) > 0) {
+                out.write(bytes, 0, count);
             }
+
+            in.close();
+            
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 }

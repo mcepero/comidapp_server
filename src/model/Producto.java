@@ -14,13 +14,15 @@ public class Producto {
     private String nombre;
     private String ingredientes;
     private double precio;
+    private String imagen;
     private int idRestaurante;
 
-    public Producto(int id, String nombre, String ingredientes, double precio, int idRestaurante) {
+    public Producto(int id, String nombre, String ingredientes, double precio, String imagen, int idRestaurante) {
         this.id = id;
         this.nombre = nombre;
         this.ingredientes = ingredientes;
         this.precio = precio;
+        this.imagen=imagen;
         this.idRestaurante = idRestaurante;
     }
 
@@ -57,6 +59,14 @@ public class Producto {
 
     public void setPrecio(double precio) {
         this.precio = precio;
+    }
+
+    public String getImagen() {
+        return imagen;
+    }
+
+    public void setImagen(String imagen) {
+        this.imagen = imagen;
     }
 
     public int getIdRestaurante() {

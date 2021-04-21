@@ -237,7 +237,7 @@ public class ManejoDB {
         }
         return r;
     }
-    
+
     public Cliente obtenerClienteNombre(String usuario) throws SQLException {
         PreparedStatement ps = conexion.prepareStatement("SELECT * FROM cliente WHERE usuario=?;");
 
@@ -311,6 +311,7 @@ public class ManejoDB {
                 p.setNombre(resultset.getString("nombre"));
                 p.setIngredientes(resultset.getString("ingredientes"));
                 p.setPrecio(resultset.getDouble("precio"));
+                p.setImagen(resultset.getString("imagen"));
                 p.setIdRestaurante(idRestaurante);
                 listaProductos.add(p);
             }
@@ -322,14 +323,15 @@ public class ManejoDB {
     }
 
     //Añade un producto a la carta de un restaurante
-    public boolean anadirProducto(int idRestaurante, String nombre, String ingredientes, double precio) {
+    public boolean anadirProducto(int idRestaurante, String nombre, String ingredientes, double precio, String nombreImagen) {
         try {
-            PreparedStatement ps = conexion.prepareStatement("INSERT INTO producto (nombre, ingredientes, precio, idRestaurante) VALUES(?,?,?,?)");
+            PreparedStatement ps = conexion.prepareStatement("INSERT INTO producto (nombre, ingredientes, precio, idRestaurante, imagen) VALUES(?,?,?,?,?)");
 
             ps.setString(1, nombre);
             ps.setString(2, ingredientes);
             ps.setDouble(3, precio);
             ps.setInt(4, idRestaurante);
+            ps.setString(5, nombreImagen);
 
             int resp = ps.executeUpdate();
             if (resp > 0) {
@@ -369,6 +371,31 @@ public class ManejoDB {
         } catch (SQLException e) {
             e.getMessage();
         }
+    }
+
+    public Producto obtenerProducto(int idProducto) {
+        Producto p = new Producto();
+        try {
+            this.sentencia = conexion.createStatement();
+            PreparedStatement ps = conexion.prepareStatement("SELECT * FROM producto WHERE id=?;");
+
+            ps.setInt(1, idProducto);
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                p.setId(resultset.getInt("id"));
+                p.setNombre(resultset.getString("nombre"));
+                p.setIngredientes(resultset.getString("ingredientes"));
+                p.setPrecio(resultset.getDouble("precio"));
+                p.setImagen(resultset.getString("imagen"));
+                p.setIdRestaurante(resultset.getInt("idRestaurante"));
+            }
+
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return p;
     }
 
     public void eliminarRepartidor(int id) {
@@ -514,5 +541,31 @@ public class ManejoDB {
             Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
         }
         return listaRepartidores;
+    }
+
+    //Obtiene todos los restaurantes para mostrarselos al cliente (más adelante filtrar por ciudad)
+    public ArrayList<Restaurante> obtenerRestaurantes() {
+        ArrayList<Restaurante> listaRestaurantes = new ArrayList<>();
+
+        try {
+            PreparedStatement ps = conexion.prepareStatement("SELECT id, nombre, email, direccion, ciudad, telefono FROM restaurante WHERE usuario!='admin';");
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                Restaurante r = new Restaurante();
+                r.setId(resultset.getInt("id"));
+                r.setNombre(resultset.getString("nombre"));
+                r.setEmail(resultset.getString("email"));
+                r.setDireccion(resultset.getString("direccion"));
+                r.setCiudad(resultset.getString("ciudad"));
+                r.setTelefono(resultset.getString("telefono"));
+                listaRestaurantes.add(r);
+            }
+
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return listaRestaurantes;
     }
 }
