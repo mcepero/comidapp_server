@@ -238,6 +238,32 @@ public class ManejoDB {
         return r;
     }
 
+    public Restaurante obtenerRestauranteMapa(String nombre, String direccion, String ciudad) throws SQLException {
+        this.sentencia = conexion.createStatement();
+        PreparedStatement ps = conexion.prepareStatement("SELECT * FROM restaurante WHERE nombre=? AND direccion=? AND ciudad=?;");
+
+        ps.setString(1, nombre);
+        ps.setString(2, direccion);
+        ps.setString(3, ciudad);
+
+        resultset = ps.executeQuery();
+        
+        Restaurante r = new Restaurante();
+
+        while (resultset.next()) {
+            r.setId(resultset.getInt("id"));
+            r.setUsuario(resultset.getString("usuario"));
+            r.setNombre(resultset.getString("nombre"));
+            r.setEmail(resultset.getString("email"));
+            r.setDireccion(resultset.getString("direccion"));
+            r.setCiudad(resultset.getString("ciudad"));
+            r.setTelefono(resultset.getString("telefono"));
+            return r;
+
+        }
+        return r;
+    }
+
     public Cliente obtenerClienteNombre(String usuario) throws SQLException {
         PreparedStatement ps = conexion.prepareStatement("SELECT * FROM cliente WHERE usuario=?;");
 
@@ -252,6 +278,7 @@ public class ManejoDB {
             c.setNombre(resultset.getString("nombre"));
             c.setEmail(resultset.getString("email"));
             c.setDireccion(resultset.getString("direccion"));
+            c.setCiudad(resultset.getString("ciudad"));
         }
         return c;
     }
@@ -345,8 +372,25 @@ public class ManejoDB {
         return false;
     }
 
-    //Modifica un producto
-    public void modificarProducto(int id, String nombre, String ingredientes, double precio) {
+    //Modifica un producto (la imagen ha cambiado)
+    public void modificarProductoConImagen(int id, String nombre, String ingredientes, double precio, String imagen) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE producto SET nombre=?, ingredientes=?, precio=?, imagen=? WHERE id=?");
+
+            ps.setString(1, nombre);
+            ps.setString(2, ingredientes);
+            ps.setDouble(3, precio);
+            ps.setString(4, imagen);
+            ps.setInt(5, id);
+
+            int resultado = ps.executeUpdate();
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+    }
+
+    //Modifica un producto (la imagen NO ha cambiado)
+    public void modificarProductoSinImagen(int id, String nombre, String ingredientes, double precio) {
         try {
             PreparedStatement ps = conexion.prepareStatement("UPDATE producto SET nombre=?, ingredientes=?, precio=? WHERE id=?");
 
@@ -567,5 +611,42 @@ public class ManejoDB {
             Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
         }
         return listaRestaurantes;
+    }
+
+    //Editar usuario (sin contraseña)
+    public void modificarPerfilUsuario(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String ciudad) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE cliente SET usuario=?, nombre=?, email=?, direccion=?, ciudad=? WHERE usuario=?");
+
+            ps.setString(1, nuevoUsuario);
+            ps.setString(2, nombre);
+            ps.setString(3, email);
+            ps.setString(4, direccion);
+            ps.setString(5, ciudad);
+            ps.setString(6, usuarioActual);
+
+            int resultado = ps.executeUpdate();
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+    }
+
+    //Editar usuario (con contraseña)
+    public void modificarPerfilUsuarioContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String ciudad, String contrasena) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE cliente SET usuario=?, nombre=?, email=?, direccion=?, ciudad=?, contrasena=? WHERE usuario=?");
+
+            ps.setString(1, nuevoUsuario);
+            ps.setString(2, nombre);
+            ps.setString(3, email);
+            ps.setString(4, direccion);
+            ps.setString(5, ciudad);
+            ps.setString(6, contrasena);
+            ps.setString(7, usuarioActual);
+
+            int resultado = ps.executeUpdate();
+        } catch (SQLException e) {
+            e.getMessage();
+        }
     }
 }

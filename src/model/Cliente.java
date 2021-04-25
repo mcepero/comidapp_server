@@ -15,13 +15,15 @@ public class Cliente {
     private String usuario;
     private String email;
     private String direccion;
+    private String ciudad;
 
-    public Cliente(int id, String nombre, String usuario, String email, String direccion) {
+    public Cliente(int id, String nombre, String usuario, String email, String direccion, String ciudad) {
         this.id = id;
         this.nombre = nombre;
         this.usuario = usuario;
         this.email = email;
         this.direccion = direccion;
+        this.ciudad=ciudad;
     }
 
 
@@ -75,6 +77,12 @@ public class Cliente {
     public void setDireccion(String direccion) {
         this.direccion = direccion;
     }
-    
-    
+
+    public String getCiudad() {
+        return ciudad;
+    }
+
+    public void setCiudad(String ciudad) {
+        this.ciudad = ciudad;
+    }
 }
