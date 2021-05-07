@@ -18,6 +18,7 @@ public class Restaurante {
     private String direccion;
     private String ciudad;
     private String telefono;
+    private String categoria;
 
     public Restaurante(int id, String usuario, String nombre, String email, String direccion, String ciudad, String telefono) {
         this.id=id;
@@ -28,6 +29,20 @@ public class Restaurante {
         this.ciudad=ciudad;
         this.telefono = telefono;
     }
+
+    public Restaurante(int id, String usuario, String nombre, String contrasena, String email, String direccion, String ciudad, String telefono, String categoria) {
+        this.id = id;
+        this.usuario = usuario;
+        this.nombre = nombre;
+        this.contrasena = contrasena;
+        this.email = email;
+        this.direccion = direccion;
+        this.ciudad = ciudad;
+        this.telefono = telefono;
+        this.categoria = categoria;
+    }
+    
+    
 
     public Restaurante() {
     }
@@ -97,6 +112,13 @@ public class Restaurante {
     public void setTelefono(String telefono) {
         this.telefono = telefono;
     }
-    
+
+    public String getCategoria() {
+        return categoria;
+    }
+
+    public void setCategoria(String categoria) {
+        this.categoria = categoria;
+    }
        
 }

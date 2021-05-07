@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import model.Cliente;
@@ -17,6 +18,7 @@ import model.Pedido;
 import model.Producto;
 import model.Repartidor;
 import model.Restaurante;
+import model.Valoracion;
 
 /**
  *
@@ -240,24 +242,24 @@ public class ManejoDB {
 
     public Restaurante obtenerRestauranteMapa(String nombre, String direccion, String ciudad) throws SQLException {
         this.sentencia = conexion.createStatement();
-        PreparedStatement ps = conexion.prepareStatement("SELECT * FROM restaurante WHERE nombre=? AND direccion=? AND ciudad=?;");
+        PreparedStatement ps = conexion.prepareStatement("SELECT r.id, r.nombre, r.email, r.direccion, r.ciudad, r.telefono, c.nombre AS nombreCategoria FROM restaurante r, categoria c WHERE r.nombre=? AND r.direccion=? AND r.ciudad=?;");
 
         ps.setString(1, nombre);
         ps.setString(2, direccion);
         ps.setString(3, ciudad);
 
         resultset = ps.executeQuery();
-        
+
         Restaurante r = new Restaurante();
 
         while (resultset.next()) {
             r.setId(resultset.getInt("id"));
-            r.setUsuario(resultset.getString("usuario"));
             r.setNombre(resultset.getString("nombre"));
             r.setEmail(resultset.getString("email"));
             r.setDireccion(resultset.getString("direccion"));
             r.setCiudad(resultset.getString("ciudad"));
             r.setTelefono(resultset.getString("telefono"));
+            r.setCategoria(resultset.getString("nombreCategoria"));
             return r;
 
         }
@@ -592,7 +594,7 @@ public class ManejoDB {
         ArrayList<Restaurante> listaRestaurantes = new ArrayList<>();
 
         try {
-            PreparedStatement ps = conexion.prepareStatement("SELECT id, nombre, email, direccion, ciudad, telefono FROM restaurante WHERE usuario!='admin';");
+            PreparedStatement ps = conexion.prepareStatement("SELECT r.id, r.nombre, r.email, r.direccion, r.ciudad, r.telefono, c.nombre AS nombreCategoria FROM restaurante r, categoria c WHERE usuario!='admin' AND r.idCategoria=c.id;");
 
             resultset = ps.executeQuery();
 
@@ -604,6 +606,7 @@ public class ManejoDB {
                 r.setDireccion(resultset.getString("direccion"));
                 r.setCiudad(resultset.getString("ciudad"));
                 r.setTelefono(resultset.getString("telefono"));
+                r.setCategoria(resultset.getString("nombreCategoria"));
                 listaRestaurantes.add(r);
             }
 
@@ -648,5 +651,122 @@ public class ManejoDB {
         } catch (SQLException e) {
             e.getMessage();
         }
+    }
+
+    //Devuelve todas las categorias para añadirlas al spinner
+    public ArrayList<String> obtenerCategorias() {
+        ArrayList<String> listaCategorias = new ArrayList<>();
+
+        try {
+            PreparedStatement ps = conexion.prepareStatement("SELECT nombre FROM categoria;");
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                listaCategorias.add(resultset.getString("nombre"));
+            }
+
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return listaCategorias;
+    }
+
+    //Devuelve todas las valoraciones de un restaurante
+    public ArrayList<Valoracion> obtenerValoraciones(int idRestaurante) {
+        ArrayList<Valoracion> listaValoraciones = new ArrayList<>();
+
+        try {
+            PreparedStatement ps = conexion.prepareStatement("SELECT * FROM valoracion WHERE idRestaurante=?;");
+
+            ps.setInt(1, idRestaurante);
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                int id = resultset.getInt("id");
+                String comentario = resultset.getString("comentario");
+                int puntuacion = resultset.getInt("puntuacion");
+                int idCliente = resultset.getInt("idCliente");
+                listaValoraciones.add(new Valoracion(id, comentario, puntuacion, idCliente));
+            }
+
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return listaValoraciones;
+    }
+
+    //Añade una valoración
+    public boolean anadirValoracion(int idRestaurante, String comentario, int puntuacion, int idCliente) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("INSERT INTO valoracion (idRestaurante, comentario, puntuacion, idCliente) VALUES(?,?,?,?)");
+
+            ps.setInt(1, idRestaurante);
+            ps.setString(2, comentario);
+            ps.setInt(3, puntuacion);
+            ps.setInt(4, idCliente);
+
+            resultset = ps.executeQuery();
+
+            return true;
+
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        return false;
+    }
+
+    //Añade un pedido al restaurante
+    public int anadirPedido(double precio, String fecha, int idCliente, int idRestaurante) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("INSERT INTO pedido (precio, fecha, estado, idCliente, idRepartidor, idRestaurante) VALUES(?,?,'Recibido',?, Null ,?)");
+
+            ps.setDouble(1, precio);
+            ps.setString(2, fecha);
+            ps.setInt(3, idCliente);
+            ps.setInt(4, idRestaurante);
+
+            resultset = ps.executeQuery();
+            
+            int id;
+            
+            ps = conexion.prepareStatement("SELECT id FROM pedido WHERE precio=? AND fecha=? AND idCliente=? AND idRestaurante=?;");
+
+            ps.setDouble(1, precio);
+            ps.setString(2, fecha);
+            ps.setInt(3, idCliente);
+            ps.setInt(4, idRestaurante);
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                id = resultset.getInt("id");
+                return id;
+            }
+            
+           
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        return 0;
+    }
+
+    //Añade un producto a un pedido (tabla productospedido);
+    public boolean anadirProductoPedido(int idProducto, int idPedido) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("INSERT INTO productospedido (idProducto, idPedido) VALUES(?,?)");
+
+            ps.setInt(1, idProducto);
+            ps.setInt(2, idPedido);
+
+            resultset = ps.executeQuery();
+
+            return true;
+
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        return false;
     }
 }
