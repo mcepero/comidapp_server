@@ -5,11 +5,13 @@
  */
 package model;
 
+import java.io.Serializable;
+
 /**
  *
  * @author Manuel
  */
-public class Restaurante {
+public class Restaurante implements Serializable{
     private int id;
     private String usuario;
     private String nombre;

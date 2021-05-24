@@ -20,6 +20,7 @@ public class Pedido {
     private ArrayList<Producto> productos;
     private int idCliente;
     private int idRepartidor;
+    private String nombreRestaurante;
 
     public Pedido(int id, double precio, String fecha, String estado, ArrayList<Producto> productos, int idCliente, int idRepartidor) {
         this.id = id;
@@ -30,6 +31,16 @@ public class Pedido {
         this.idCliente = idCliente;
         this.idRepartidor = idRepartidor;
     }
+
+    public Pedido(int id, double precio, String fecha, String estado, String nombreRestaurante) {
+        this.id = id;
+        this.precio = precio;
+        this.fecha = fecha;
+        this.estado = estado;
+        this.nombreRestaurante = nombreRestaurante;
+    }
+    
+    
 
     public Pedido() {
         productos = new ArrayList<>();
@@ -90,7 +101,13 @@ public class Pedido {
     public void setProductos(ArrayList<Producto> productos) {
         this.productos = productos;
     }
-    
-    
+
+    public String getNombreRestaurante() {
+        return nombreRestaurante;
+    }
+
+    public void setNombreRestaurante(String nombreRestaurante) {
+        this.nombreRestaurante = nombreRestaurante;
+    }  
     
 }

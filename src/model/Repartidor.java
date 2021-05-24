@@ -15,15 +15,15 @@ public class Repartidor {
     private String usuario;
     private String email;
     private String dni;
-    private String direccion;
+    private String restaurante;
 
-    public Repartidor(int id, String nombre, String usuario, String email, String dni, String direccion) {
+    public Repartidor(int id, String nombre, String usuario, String email, String dni, String restaurante) {
         this.id = id;
         this.nombre = nombre;
         this.usuario = usuario;
         this.email = email;
         this.dni = dni;
-        this.direccion = direccion;
+        this.restaurante=restaurante;
     }
 
     public Repartidor() {
@@ -69,15 +69,12 @@ public class Repartidor {
         this.dni = dni;
     }
 
-    public String getDireccion() {
-        return direccion;
+    public String getRestaurante() {
+        return restaurante;
     }
 
-    public void setDireccion(String direccion) {
-        this.direccion = direccion;
+    public void setRestaurante(String restaurante) {
+        this.restaurante = restaurante;
     }
-
    
-    
-    
 }

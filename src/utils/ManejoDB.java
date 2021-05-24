@@ -461,7 +461,7 @@ public class ManejoDB {
     public ArrayList<Pedido> obtenerPedidos(int idRestaurante) throws SQLException {
         ArrayList<Pedido> listaPedidos = new ArrayList<>();
 
-        PreparedStatement ps = conexion.prepareStatement("SELECT id, fecha, estado, precio, idCliente, idRepartidor, idRestaurante FROM pedido WHERE idRestaurante=? ORDER BY fecha DESC;");
+        PreparedStatement ps = conexion.prepareStatement("SELECT id, fecha, e.nombre AS nombreestado, precio, idCliente, idRepartidor, idRestaurante FROM pedido, estado e WHERE idRestaurante=? ORDER BY fecha DESC;");
 
         ps.setInt(1, idRestaurante);
         resultset = ps.executeQuery();
@@ -470,7 +470,7 @@ public class ManejoDB {
             int id = resultset.getInt("id");
             p.setId(id);
             p.setFecha(resultset.getString("fecha"));
-            p.setEstado(resultset.getString("estado"));
+            p.setEstado(resultset.getString("nombreEstado"));
             p.setPrecio(resultset.getDouble("precio"));
             p.setIdCliente(resultset.getInt("idCliente"));
             p.setIdRepartidor(resultset.getInt("idRepartidor"));
@@ -520,13 +520,14 @@ public class ManejoDB {
             c.setNombre(resultset.getString("nombre"));
             c.setEmail(resultset.getString("email"));
             c.setDireccion(resultset.getString("direccion"));
+            c.setCiudad(resultset.getString("ciudad"));
         }
         return c;
     }
 
     public Pedido obtenerPedido(int idPedido) throws SQLException {
         this.sentencia = conexion.createStatement();
-        PreparedStatement ps = conexion.prepareStatement("SELECT * FROM pedido WHERE id=?;");
+        PreparedStatement ps = conexion.prepareStatement("SELECT p.id, p.precio, p.fecha, e.nombre AS nombreestado, p.idCliente, p.idRepartidor FROM pedido p, estado e WHERE p.id=?;");
 
         ps.setInt(1, idPedido);
 
@@ -537,7 +538,7 @@ public class ManejoDB {
             p.setId(resultset.getInt("id"));
             p.setPrecio(resultset.getDouble("precio"));
             p.setFecha(resultset.getString("fecha"));
-            p.setEstado(resultset.getString("estado"));
+            p.setEstado(resultset.getString("nombreestado"));
             p.setIdCliente(resultset.getInt("idCliente"));
             p.setIdRepartidor(resultset.getInt("idRepartidor"));
             p.setProductos(obtenerProductos(idPedido));
@@ -720,7 +721,7 @@ public class ManejoDB {
     //Añade un pedido al restaurante
     public int anadirPedido(double precio, String fecha, int idCliente, int idRestaurante) {
         try {
-            PreparedStatement ps = conexion.prepareStatement("INSERT INTO pedido (precio, fecha, estado, idCliente, idRepartidor, idRestaurante) VALUES(?,?,'Recibido',?, Null ,?)");
+            PreparedStatement ps = conexion.prepareStatement("INSERT INTO pedido (precio, fecha, idEstado, idCliente, idRepartidor, idRestaurante) VALUES(?,?,'1',?, Null ,?)");
 
             ps.setDouble(1, precio);
             ps.setString(2, fecha);
@@ -728,9 +729,9 @@ public class ManejoDB {
             ps.setInt(4, idRestaurante);
 
             resultset = ps.executeQuery();
-            
+
             int id;
-            
+
             ps = conexion.prepareStatement("SELECT id FROM pedido WHERE precio=? AND fecha=? AND idCliente=? AND idRestaurante=?;");
 
             ps.setDouble(1, precio);
@@ -744,8 +745,7 @@ public class ManejoDB {
                 id = resultset.getInt("id");
                 return id;
             }
-            
-           
+
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
@@ -769,4 +769,250 @@ public class ManejoDB {
         }
         return false;
     }
+
+    //Añade el ID de un repartidor al pedido
+    public void adjudicarRepartidor(int idRepartidor, int idPedido) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE pedido SET idRepartidor=? WHERE id=?");
+
+            ps.setInt(1, idRepartidor);
+            ps.setInt(2, idPedido);
+
+            int resultado = ps.executeUpdate();
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+    }
+
+    //Devuelve un repartidor
+    public Repartidor obtenerRepartidor(int idRepartidor) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("SELECT * FROM repartidor WHERE id=?;");
+
+            ps.setInt(1, idRepartidor);
+
+            resultset = ps.executeQuery();
+
+            Repartidor r = new Repartidor();
+            while (resultset.next()) {
+                r.setId(resultset.getInt("id"));
+                r.setNombre(resultset.getString("nombre"));
+                r.setDni(resultset.getString("dni"));
+                r.setEmail(resultset.getString("email"));
+                return r;
+            }
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+
+    //Devuelve los pedidos de un usuario
+    public ArrayList<Pedido> obtenerPedidosUsuario(int idCliente) {
+        try {
+            ArrayList<Pedido> listaPedidos = new ArrayList<>();
+
+            PreparedStatement ps = conexion.prepareStatement("SELECT p.id, p.fecha, e.nombre AS nombreestado, p.precio, p.idRepartidor, r.nombre FROM pedido p, restaurante r, estado e WHERE p.idCliente=? AND p.idRestaurante=r.id AND p.idEstado=e.id ORDER BY fecha DESC;");
+
+            ps.setInt(1, idCliente);
+            resultset = ps.executeQuery();
+            while (resultset.next()) {
+                Pedido p = new Pedido();
+                int id = resultset.getInt("id");
+                p.setId(id);
+                p.setFecha(resultset.getString("fecha"));
+                p.setEstado(resultset.getString("nombreestado"));
+                p.setPrecio(resultset.getDouble("precio"));
+                p.setNombreRestaurante(resultset.getString("nombre"));
+                listaPedidos.add(p);
+            }
+            return listaPedidos;
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+
+    //Devuelve los pedidos de un repartidor
+    public ArrayList<Pedido> obtenerPedidosRepartidor(int idRepartidor) {
+        try {
+            ArrayList<Pedido> listaPedidos = new ArrayList<>();
+
+            PreparedStatement ps = conexion.prepareStatement("SELECT p.id, p.fecha, p.precio, e.nombre AS nombreestado, p.idRepartidor, r.nombre FROM pedido p, restaurante r, estado e WHERE p.idRepartidor=? AND p.idRestaurante=r.id AND p.idEstado=e.id ORDER BY fecha DESC;");
+
+            ps.setInt(1, idRepartidor);
+            resultset = ps.executeQuery();
+            while (resultset.next()) {
+                Pedido p = new Pedido();
+                int id = resultset.getInt("id");
+                p.setId(id);
+                p.setFecha(resultset.getString("fecha"));
+                p.setEstado(resultset.getString("nombreestado"));
+                p.setPrecio(resultset.getDouble("precio"));
+                p.setNombreRestaurante(resultset.getString("nombre"));
+                p.setIdRepartidor(resultset.getInt("idRepartidor"));
+                listaPedidos.add(p);
+            }
+            return listaPedidos;
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+
+    //Obtener un restaurante con el ID
+    public Restaurante obtenerRestauranteId(int idRestaurante) throws SQLException {
+        this.sentencia = conexion.createStatement();
+        PreparedStatement ps = conexion.prepareStatement("SELECT * FROM restaurante WHERE id=?;");
+
+        ps.setInt(1, idRestaurante);
+
+        resultset = ps.executeQuery();
+
+        Restaurante r = new Restaurante();
+        while (resultset.next()) {
+            r.setId(resultset.getInt("id"));
+            r.setUsuario(resultset.getString("usuario"));
+            r.setNombre(resultset.getString("nombre"));
+            r.setEmail(resultset.getString("email"));
+            r.setDireccion(resultset.getString("direccion"));
+            r.setTelefono(resultset.getString("telefono"));
+        }
+        return r;
+    }
+
+    public boolean iniciarSesionRepartidor(String usuario, String contrasena) {
+        try {
+            this.sentencia = conexion.createStatement();
+            PreparedStatement ps = conexion.prepareStatement("SELECT usuario, contrasena FROM repartidor WHERE usuario=? AND contrasena=?;");
+
+            ps.setString(1, usuario);
+            ps.setString(2, contrasena);
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                return true;
+            }
+
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+
+        return false;
+    }
+
+    public Repartidor obtenerRepartidorNombre(String usuario) throws SQLException {
+        PreparedStatement ps = conexion.prepareStatement("SELECT * FROM repartidor WHERE usuario=?;");
+
+        ps.setString(1, usuario);
+
+        resultset = ps.executeQuery();
+
+        Repartidor r = new Repartidor();
+        while (resultset.next()) {
+            r.setId(resultset.getInt("id"));
+            r.setUsuario(resultset.getString("usuario"));
+            r.setNombre(resultset.getString("nombre"));
+            r.setEmail(resultset.getString("email"));
+            r.setDni(resultset.getString("dni"));
+            Restaurante restaurante = obtenerRestauranteId(resultset.getInt("idRestaurante"));
+            r.setRestaurante(restaurante.getNombre());
+        }
+        return r;
+    }
+
+    //Editar repartidor (sin contraseña)
+    public void modificarPerfilRepartidor(String usuarioActual, String nuevoUsuario, String email, String nombre, String dni) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE repartidor SET usuario=?, nombre=?, email=?, dni=? WHERE usuario=?");
+
+            ps.setString(1, nuevoUsuario);
+            ps.setString(2, nombre);
+            ps.setString(3, email);
+            ps.setString(4, dni);
+            ps.setString(5, usuarioActual);
+
+            int resultado = ps.executeUpdate();
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+    }
+
+    //Editar repartidor (con contraseña)
+    public void modificarPerfilRepartidorContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String dni, String contrasena) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE repartidor SET usuario=?, nombre=?, email=?, dni=?, contrasena=? WHERE usuario=?");
+
+            ps.setString(1, nuevoUsuario);
+            ps.setString(2, nombre);
+            ps.setString(3, email);
+            ps.setString(4, dni);
+            ps.setString(5, contrasena);
+            ps.setString(6, usuarioActual);
+
+            int resultado = ps.executeUpdate();
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+    }
+
+    //Actualiza el estado de un pedido
+    public boolean actualizarEstado(int idPedido, int idEstado) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE pedido SET idEstado=? WHERE id=?");
+
+            ps.setInt(1, idEstado);
+            ps.setInt(2, idPedido);
+
+            int resultado = ps.executeUpdate();
+
+            if (resultado == 1) {
+                return true;
+            }
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+        return false;
+    }
+
+    //Actualiza el estado de un pedido
+    public ArrayList<String> obtenerEstados() {
+        ArrayList<String> estados = new ArrayList();
+
+        try {
+            PreparedStatement ps = conexion.prepareStatement("SELECT nombre FROM estado;");
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                estados.add(resultset.getString("nombre"));
+            }
+
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+        return estados;
+    }
+
+    //Obtiene el nombre de un estado a traves del ID
+    public String obtenerNombreEstado(int id) {
+        String estado = "";
+        try {
+            PreparedStatement ps = conexion.prepareStatement("SELECT nombre FROM estado WHERE id=?;");
+
+            ps.setInt(1, id);
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                estado = resultset.getString("nombre");
+            }
+
+        } catch (SQLException e) {
+            e.getMessage();
+        }
+        return estado;
+    }
+
 }

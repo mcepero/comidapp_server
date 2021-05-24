@@ -5,9 +5,14 @@
  */
 package servidor;
 
+import java.awt.Graphics;
+import java.awt.Image;
+import java.awt.image.BufferedImage;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -23,6 +28,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.imageio.ImageIO;
+import javax.swing.ImageIcon;
 import model.Cliente;
 import model.Pedido;
 import model.Producto;
@@ -43,6 +50,7 @@ public class HiloCliente extends Thread {
     private BufferedReader entrada;
     private PrintWriter salida;
     private ManejoDB manejodb;
+    // private ObjectOutputStream envioObjetos;
 
     public HiloCliente(Socket socket, Servidor servidor) {
         manejodb = new ManejoDB();
@@ -82,7 +90,7 @@ public class HiloCliente extends Thread {
                     }
                     //Registro para usuario
                 } else if (flag.equals(Mensajes.PETICION_REGISTRO)) {
-                    if (manejodb.registroUsuario(args[1], args[2], args[2], args[3], args[4])) {
+                    if (manejodb.registroUsuario(args[1], args[2], args[3], args[4], args[5])) {
                         System.out.println("Registro correcto");
                         salida.println(Mensajes.PETICION_REGISTRO_CORRECTO);
                     } else {
@@ -121,7 +129,7 @@ public class HiloCliente extends Thread {
                     salida.println(Mensajes.PETICION_MOSTRAR_CARTA_CORRECTO + "--" + listaProductos.size());
                     for (int i = 0; i < listaProductos.size(); i++) {
                         salida.println(Mensajes.PETICION_MOSTRAR_CARTA_CORRECTO + "--" + listaProductos.get(i).getNombre() + "--" + listaProductos.get(i).getIngredientes() + "--" + listaProductos.get(i).getPrecio() + "--" + listaProductos.get(i).getId() + "--" + listaProductos.get(i).getIdRestaurante());
-                        // enviarImagen(listaProductos.get(i).getImagen());                         
+                        //enviarImagen(listaProductos.get(i).getImagen());                         
                     }
                     //Añadir un producto a la carta de un restaurante
                 } else if (flag.equals(Mensajes.PETICION_ANADIR_PRODUCTO)) {
@@ -160,7 +168,15 @@ public class HiloCliente extends Thread {
                 } else if (flag.equals(Mensajes.PETICION_MOSTRAR_DETALLESPEDIDO)) {
                     Pedido p = manejodb.obtenerPedido(Integer.parseInt(args[1]));
                     Cliente c = manejodb.obtenerCliente(p.getIdCliente());
-                    salida.println(Mensajes.PETICION_MOSTRAR_DETALLESPEDIDO_CORRECTO + "--" + c.getDireccion() + "--" + c.getNombre() + "--" + p.getFecha() + "--" + p.getPrecio() + "--" + p.getEstado() + "--" + p.getIdCliente() + "--" + p.getIdRepartidor() + "--" + p.getProductos().size());
+                    Repartidor r = null;
+                    if (p.getIdRepartidor() != 0) {
+                        r = manejodb.obtenerRepartidor(p.getIdRepartidor());
+                    }
+                    if (r != null) {
+                        salida.println(Mensajes.PETICION_MOSTRAR_DETALLESPEDIDO_CORRECTO + "--" + c.getDireccion() + "--" + c.getNombre() + "--" + p.getFecha() + "--" + p.getPrecio() + "--" + r.getNombre() + "--" + p.getEstado() + "--" + p.getIdCliente() + "--" + p.getIdRepartidor() + "--" + p.getProductos().size());
+                    } else {
+                        salida.println(Mensajes.PETICION_MOSTRAR_DETALLESPEDIDO_CORRECTO + "--" + c.getDireccion() + "--" + c.getNombre() + "--" + p.getFecha() + "--" + p.getPrecio() + "--" + 0 + "--" + p.getEstado() + "--" + p.getIdCliente() + "--" + p.getIdRepartidor() + "--" + p.getProductos().size());
+                    }
                     for (int i = 0; i < p.getProductos().size(); i++) {
                         salida.println(Mensajes.PETICION_MOSTRAR_DETALLESPEDIDO_CORRECTO + "--" + p.getProductos().get(i).getNombre() + "--" + p.getProductos().get(i).getIngredientes() + "--" + p.getProductos().get(i).getPrecio());
                     }
@@ -178,7 +194,7 @@ public class HiloCliente extends Thread {
                     ArrayList<Repartidor> listaRepartidores = manejodb.obtenerRepartidores(Integer.parseInt(args[1]));
                     salida.println(Mensajes.PETICION_MOSTRAR_REPARTIDORES_CORRECTO + "--" + listaRepartidores.size());
                     for (int i = 0; i < listaRepartidores.size(); i++) {
-                        salida.println(Mensajes.PETICION_MOSTRAR_REPARTIDORES_CORRECTO + "--" + listaRepartidores.get(i).getId() + "--" + listaRepartidores.get(i).getNombre() + "--" + listaRepartidores.get(i).getUsuario() + "--" + listaRepartidores.get(i).getEmail() + "--" + listaRepartidores.get(i).getDni() + "--" + listaRepartidores.get(i).getDireccion());
+                        salida.println(Mensajes.PETICION_MOSTRAR_REPARTIDORES_CORRECTO + "--" + listaRepartidores.get(i).getId() + "--" + listaRepartidores.get(i).getNombre() + "--" + listaRepartidores.get(i).getUsuario() + "--" + listaRepartidores.get(i).getEmail() + "--" + listaRepartidores.get(i).getDni());
                     }
                     //Elimina a un repartidor de un restaurante (en la BD le deja el campo idRestaurante null)
                 } else if (flag.equals(Mensajes.PETICION_ELIMINAR_REPARTIDOR)) {
@@ -187,10 +203,12 @@ public class HiloCliente extends Thread {
                     salida.println(Mensajes.PETICION_ELIMINAR_REPARTIDOR_CORRECTO);
                 } else if (flag.equals(Mensajes.PETICION_MOSTRAR_RESTAURANTES)) {
                     ArrayList<Restaurante> listaRestaurantes = manejodb.obtenerRestaurantes();
+                    //envioObjetos = new ObjectOutputStream(socket.getOutputStream());
+                    // envioObjetos.writeObject(listaRestaurantes);
                     salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaRestaurantes.size());
 
                     for (int i = 0; i < listaRestaurantes.size(); i++) {
-                        salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaRestaurantes.get(i).getNombre() + "--" + listaRestaurantes.get(i).getEmail() + "--" + listaRestaurantes.get(i).getTelefono() + "--" + listaRestaurantes.get(i).getDireccion() + "--" + listaRestaurantes.get(i).getCiudad() + "--" + listaRestaurantes.get(i).getCategoria()+"--"+listaRestaurantes.get(i).getId());
+                        salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaRestaurantes.get(i).getNombre() + "--" + listaRestaurantes.get(i).getEmail() + "--" + listaRestaurantes.get(i).getTelefono() + "--" + listaRestaurantes.get(i).getDireccion() + "--" + listaRestaurantes.get(i).getCiudad() + "--" + listaRestaurantes.get(i).getCategoria() + "--" + listaRestaurantes.get(i).getId());
                     }
                     //Edita la foto del producto
                 } else if (flag.equals(Mensajes.PETICION_FOTO_PRODUCTO)) {
@@ -206,30 +224,100 @@ public class HiloCliente extends Thread {
                     //Envía un restaurante para abrirlo
                 } else if (flag.equals(Mensajes.PETICION_OBTENER_RESTAURANTE)) {
                     Restaurante r = manejodb.obtenerRestauranteMapa(args[1], args[2], args[3]);
-                    salida.println(Mensajes.PETICION_OBTENER_RESTAURANTE_CORRECTO + "--" + r.getNombre() + "--" + r.getEmail() + "--" + r.getTelefono() + "--" + r.getDireccion() + "--" + r.getCiudad() + "--" + r.getCategoria());
+                    salida.println(Mensajes.PETICION_OBTENER_RESTAURANTE_CORRECTO + "--" + r.getNombre() + "--" + r.getEmail() + "--" + r.getTelefono() + "--" + r.getDireccion() + "--" + r.getCiudad() + "--" + r.getCategoria() + "--" + r.getId());
                 } else if (flag.equals(Mensajes.PETICION_OBTENER_CATEGORIAS)) {
                     ArrayList<String> categorias = manejodb.obtenerCategorias();
                     salida.println(Mensajes.PETICION_OBTENER_RESTAURANTE_CORRECTO + "--" + categorias.size());
                     for (int i = 0; i < categorias.size(); i++) {
                         salida.println(Mensajes.PETICION_OBTENER_RESTAURANTE_CORRECTO + "--" + categorias.get(i));
                     }
-                    
+
                 } else if (flag.equals(Mensajes.PETICION_MOSTRAR_VALORACIONES)) {
                     ArrayList<Valoracion> valoraciones = manejodb.obtenerValoraciones(Integer.parseInt(args[1]));
                     salida.println(Mensajes.PETICION_MOSTRAR_VALORACIONES_CORRECTO + "--" + valoraciones.size());
                     for (int i = 0; i < valoraciones.size(); i++) {
-                        salida.println(Mensajes.PETICION_MOSTRAR_VALORACIONES_CORRECTO + "--" + valoraciones.get(i).getId()+"--"+valoraciones.get(i).getComentario()+"--"+valoraciones.get(i).getNota() + "--" + valoraciones.get(i).getIdCliente());
+                        salida.println(Mensajes.PETICION_MOSTRAR_VALORACIONES_CORRECTO + "--" + valoraciones.get(i).getId() + "--" + valoraciones.get(i).getComentario() + "--" + valoraciones.get(i).getNota() + "--" + valoraciones.get(i).getIdCliente());
                     }
-                }else if (flag.equals(Mensajes.PETICION_ANADIR_VALORACION)) {
-                   manejodb.anadirValoracion(Integer.parseInt(args[1]), args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]));
-                   salida.println(Mensajes.PETICION_ANADIR_VALORACION_CORRECTO);
-                }else if (flag.equals(Mensajes.PETICION_REALIZAR_PEDIDO)) {
-                   int idPedido = manejodb.anadirPedido(Double.parseDouble(args[1]), args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]));          
-                   String[] idProductos = args[5].split("/");
+                } else if (flag.equals(Mensajes.PETICION_ANADIR_VALORACION)) {
+                    manejodb.anadirValoracion(Integer.parseInt(args[1]), args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]));
+                    salida.println(Mensajes.PETICION_ANADIR_VALORACION_CORRECTO);
+                } else if (flag.equals(Mensajes.PETICION_REALIZAR_PEDIDO)) {
+                    int idPedido = manejodb.anadirPedido(Double.parseDouble(args[1]), args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]));
+                    String[] idProductos = args[5].split("/");
                     for (int i = 0; i < idProductos.length; i++) {
                         manejodb.anadirProductoPedido(Integer.parseInt(idProductos[i]), idPedido);
                     }
-                  // salida.println(Mensajes.PETICION_REALIZAR_PEDIDO_CORRECTO);
+                    // salida.println(Mensajes.PETICION_REALIZAR_PEDIDO_CORRECTO);
+                } else if (flag.equals(Mensajes.PETICION_CARGAR_IMAGEN)) {
+                    enviarImagen(args[2] + args[1] + ".jpg");
+                } else if (flag.equals(Mensajes.PETICION_ADJUDICAR_REPARTIDOR)) {
+                    manejodb.adjudicarRepartidor(Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+                } else if (flag.equals(Mensajes.PETICION_MOSTRAR_PEDIDOS_USUARIO)) {
+                    ArrayList<Pedido> listaPedidos = manejodb.obtenerPedidosUsuario(Integer.parseInt(args[1]));
+                    salida.println(Mensajes.PETICION_MOSTRAR_PEDIDOS_USUARIO_CORRECTO + "--" + listaPedidos.size());
+
+                    for (int i = 0; i < listaPedidos.size(); i++) {
+                        salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaPedidos.get(i).getId() + "--" + listaPedidos.get(i).getPrecio() + "--" + listaPedidos.get(i).getFecha() + "--" + listaPedidos.get(i).getEstado() + "--" + listaPedidos.get(i).getNombreRestaurante());
+                    }
+                    //Envía los productos de un pedido para el usuario
+                } else if (flag.equals(Mensajes.PETICION_MOSTRAR_DETALLES_PEDIDO)) {
+                    Pedido p = manejodb.obtenerPedido(Integer.parseInt(args[1]));
+                    salida.println(Mensajes.PETICION_MOSTRAR_DETALLES_PEDIDO_CORRECTO + "--" + p.getProductos().size());
+                    for (int i = 0; i < p.getProductos().size(); i++) {
+                        salida.println(Mensajes.PETICION_MOSTRAR_DETALLES_PEDIDO_CORRECTO + "--" + p.getProductos().get(i).getNombre() + "--" + p.getProductos().get(i).getPrecio() + "--" + p.getProductos().get(i).getIngredientes());
+                    }
+
+                    //Inicio de sesión del repartidor (parámentros usuario y contraseña)
+                } else if (flag.equals(Mensajes.PETICION_LOGIN_REPARTIDOR)) {
+                    if (manejodb.iniciarSesionRepartidor(args[1], args[2])) {
+                        System.out.println("Ok...");
+                        Repartidor r = manejodb.obtenerRepartidorNombre(args[1]);
+                        salida.println(Mensajes.PETICION_LOGIN_REPARTIDOR_CORRECTO + "--" + r.getId() + "--" + r.getEmail() + "--" + r.getNombre() + "--" + r.getDni() + "--" + r.getRestaurante());
+                    } else {
+                        salida.println(Mensajes.PETICION_LOGIN_REPARTIDOR_ERROR);
+                        System.out.println("Error");
+                    }
+                } else if (flag.equals(Mensajes.PETICION_REGISTRO_REPARTIDOR)) {
+                    if (manejodb.registroRepartidor(args[1], args[2], args[3], args[4], args[5])) {
+                        System.out.println("Registro correcto");
+                        salida.println(Mensajes.PETICION_REGISTRO_REPARTIDOR_CORRECTO);
+                    } else {
+                        System.out.println("Error al registrarse");
+                        salida.println(Mensajes.PETICION_REGISTRO_REPARTIDOR_ERROR);
+                    }
+                    //Edita el perfil del repartidor
+                } else if (flag.equals(Mensajes.PETICION_EDITAR_PERFIL_REPARTIDOR)) {
+                    if (args.length == 6) {
+                        manejodb.modificarPerfilRepartidor(args[1], args[2], args[3], args[4], args[5]);
+                    } else if (args.length == 7) {
+                        manejodb.modificarPerfilRepartidorContrasena(args[1], args[2], args[3], args[4], args[5], args[6]);
+                    }
+                    //Envía la lista de pedidos de un repartidor (devuelve dirección del cliente también)
+                } else if (flag.equals(Mensajes.PETICION_MOSTRAR_PEDIDOS_REPARTIDOR)) {
+                    ArrayList<Pedido> listaPedidos = manejodb.obtenerPedidosRepartidor(Integer.parseInt(args[1]));
+                    salida.println(Mensajes.PETICION_MOSTRAR_PEDIDOS_REPARTIDOR_CORRECTO + "--" + listaPedidos.size());
+
+                    for (int i = 0; i < listaPedidos.size(); i++) {
+                        Cliente c = manejodb.obtenerCliente(listaPedidos.get(i).getId());
+                        salida.println(Mensajes.PETICION_MOSTRAR_PEDIDOS_REPARTIDOR_CORRECTO + "--" + listaPedidos.get(i).getId() + "--" + listaPedidos.get(i).getPrecio() + "--" + listaPedidos.get(i).getFecha() + "--" + listaPedidos.get(i).getEstado() + "--" + listaPedidos.get(i).getNombreRestaurante() + "--" + c.getDireccion() + "--" + c.getCiudad() + "--" + c.getEmail());
+                    }
+                    //Envía los detalles de un pedido al repartidor (con los datos de entrega)
+                } else if (flag.equals(Mensajes.PETICION_MOSTRAR_DETALLES_PEDIDO_REPARTIDOR)) {
+                    Pedido p = manejodb.obtenerPedido(Integer.parseInt(args[1]));
+                    Cliente c = manejodb.obtenerCliente(p.getIdCliente());
+                    salida.println(Mensajes.PETICION_MOSTRAR_DETALLES_PEDIDO_REPARTIDOR_CORRECTO + "--" + p.getId() + "--" + p.getPrecio() + "--" + p.getFecha() + "--" + p.getEstado() + "--" + p.getNombreRestaurante() + "--" + c.getNombre() + "--" + c.getEmail() + "--" + c.getDireccion() + "--" + c.getCiudad());
+                } else if (flag.equals(Mensajes.PETICION_ACTUALIZAR_ESTADO)) {
+                    manejodb.actualizarEstado(Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+                } else if (flag.equals(Mensajes.PETICION_OBTENER_ESTADOS)) {
+                    //envioObjetos = new ObjectOutputStream(socket.getOutputStream());
+
+                    ArrayList<String> estados = manejodb.obtenerEstados();
+                    // envioObjetos.writeObject(estados);
+
+                    salida.println(Mensajes.PETICION_OBTENER_ESTADOS_CORRECTO + "--" + estados.size());
+                    for (int i = 0; i < estados.size(); i++) {
+                        salida.println(Mensajes.PETICION_OBTENER_ESTADOS_CORRECTO +"--"+ estados.get(i));
+                    }
                 }
 
             }
@@ -246,15 +334,6 @@ public class HiloCliente extends Thread {
                 Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex1);
             }
         }
-        /*    } catch (IOException ex) {
-            Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
-         */ //} finally {
-        /*      try {
-                oos.close();
-            } catch (IOException ex) {
-                Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
-            }*/
-        //}
     }
 
     public String leerImagen(String idRestaurante, String nombre) {
@@ -265,6 +344,7 @@ public class HiloCliente extends Thread {
         try {
             in = socket.getInputStream();
             nombreImagen = nombre + idRestaurante + ".jpg";
+            System.out.println(nombreImagen);
             out = new FileOutputStream("E:\\manuel\\Documents\\DAM\\2 DAM 2020\\Proyecto\\Servidor\\imagenescomida\\" + nombreImagen);
             byte[] bytes = new byte[8096];
 
@@ -277,6 +357,7 @@ public class HiloCliente extends Thread {
 
             do {
                 count = in.read(bytes);
+                System.out.println(count);
                 out.write(bytes, 0, count);
             } while (count == 8096);
 
@@ -296,9 +377,10 @@ public class HiloCliente extends Thread {
             in = new FileInputStream("E:\\manuel\\Documents\\DAM\\2 DAM 2020\\Proyecto\\Servidor\\imagenescomida\\" + imagen);
             OutputStream out = socket.getOutputStream();
             int count;
-            while ((count = in.read(bytes)) > 0) {
+            do {
+                count = in.read(bytes);
                 out.write(bytes, 0, count);
-            }
+            } while (count == 8096);
 
             in.close();
 
