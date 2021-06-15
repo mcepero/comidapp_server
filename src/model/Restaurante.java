@@ -21,6 +21,8 @@ public class Restaurante implements Serializable{
     private String ciudad;
     private String telefono;
     private String categoria;
+    private double latitud;
+    private double longitud;
 
     public Restaurante(int id, String usuario, String nombre, String email, String direccion, String ciudad, String telefono) {
         this.id=id;
@@ -43,7 +45,20 @@ public class Restaurante implements Serializable{
         this.telefono = telefono;
         this.categoria = categoria;
     }
-    
+
+    public Restaurante(int id, String usuario, String nombre, String contrasena, String email, String direccion, String ciudad, String telefono, String categoria, double latitud, double longitud) {
+        this.id = id;
+        this.usuario = usuario;
+        this.nombre = nombre;
+        this.contrasena = contrasena;
+        this.email = email;
+        this.direccion = direccion;
+        this.ciudad = ciudad;
+        this.telefono = telefono;
+        this.categoria = categoria;
+        this.latitud = latitud;
+        this.longitud = longitud;
+    }
     
 
     public Restaurante() {
@@ -122,5 +137,23 @@ public class Restaurante implements Serializable{
     public void setCategoria(String categoria) {
         this.categoria = categoria;
     }
+
+    public double getLatitud() {
+        return latitud;
+    }
+
+    public void setLatitud(double latitud) {
+        this.latitud = latitud;
+    }
+
+    public double getLongitud() {
+        return longitud;
+    }
+
+    public void setLongitud(double longitud) {
+        this.longitud = longitud;
+    }
+    
+    
        
 }

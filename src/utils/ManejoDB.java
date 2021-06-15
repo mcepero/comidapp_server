@@ -5,12 +5,19 @@
  */
 package utils;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import model.Cliente;
@@ -45,7 +52,8 @@ public class ManejoDB {
         try {
             this.conexion = DriverManager.getConnection(url, user, pass);
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Error al conectar con la base de datos");
+        } catch (Exception e) {
             System.out.println("Error al conectar con la base de datos");
         }
     }
@@ -71,9 +79,9 @@ public class ManejoDB {
         return false;
     }
 
-    public boolean registroUsuario(String usuario, String email, String contrasena, String nombre, String direccion) {
+    public boolean registroUsuario(String usuario, String email, String contrasena, String nombre, String direccion, String ciudad) {
         try {
-            PreparedStatement ps = conexion.prepareStatement("INSERT INTO cliente (nombre, usuario, contrasena, email, direccion) VALUES(?,?,?,?,?)");
+            PreparedStatement ps = conexion.prepareStatement("INSERT INTO cliente (usuario, email, contrasena, nombre, direccion, ciudad) VALUES(?,?,?,?,?,?)");
 
             if (!comprobarUsuarioRepetido(usuario, email)) {
                 ps.setString(1, usuario);
@@ -81,6 +89,7 @@ public class ManejoDB {
                 ps.setString(3, contrasena);
                 ps.setString(4, nombre);
                 ps.setString(5, direccion);
+                ps.setString(6, ciudad);
 
                 resultset = ps.executeQuery();
 
@@ -94,7 +103,7 @@ public class ManejoDB {
     }
 
     //Añade un repartidor
-    public boolean registroRepartidor(String usuario, String email, String contrasena, String nombre, String dni) {
+    public boolean registroRepartidor(String usuario, String contrasena, String email, String nombre, String dni) {
         try {
             PreparedStatement ps = conexion.prepareStatement("INSERT INTO repartidor (usuario, nombre, contrasena, email, dni) VALUES(?,?,?,?,?)");
 
@@ -176,12 +185,12 @@ public class ManejoDB {
         return false;
     }
 
-    public boolean registroRestaurante(String usuario, String email, String contrasena, String nombre, String direccion, String telefono, String ciudad) {
+    public boolean registroRestaurante(String usuario, String email, String contrasena, String nombre, String direccion, String telefono, String ciudad, int idCategoria) {
         System.out.println(telefono);
         try {
-            PreparedStatement ps = conexion.prepareStatement("INSERT INTO restaurante (usuario, email, contrasena, nombre, direccion, telefono, ciudad) VALUES(?,?,?,?,?,?,?)");
+            PreparedStatement ps = conexion.prepareStatement("INSERT INTO restaurante (usuario, email, contrasena, nombre, direccion, telefono, ciudad, idCategoria) VALUES(?,?,?,?,?,?,?,?)");
 
-            if (!comprobarUsuarioRepetido(usuario, email)) {
+            if (!comprobarRestauranteRepetido(usuario, email)) {
                 ps.setString(1, usuario);
                 ps.setString(2, email);
                 ps.setString(3, contrasena);
@@ -189,6 +198,7 @@ public class ManejoDB {
                 ps.setString(5, direccion);
                 ps.setString(6, telefono);
                 ps.setString(7, ciudad);
+                ps.setInt(8, idCategoria);
 
                 resultset = ps.executeQuery();
 
@@ -200,7 +210,7 @@ public class ManejoDB {
         }
         return false;
     }
-
+    
     public boolean comprobarRestauranteRepetido(String usuario, String email) {
         try {
             this.sentencia = conexion.createStatement();
@@ -208,6 +218,29 @@ public class ManejoDB {
 
             ps.setString(1, usuario);
             ps.setString(2, email);
+
+            resultset = ps.executeQuery();
+
+            while (resultset.next()) {
+                return true;
+            }
+        } catch (SQLException ex) {
+            Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return false;
+    }
+    
+    
+    //Mismo método que el de comprobarRestauranteRepetido, solo que recibe el usuario y email actual
+    public boolean comprobarRestauranteRepetidoActualizar(String usuario, String email, String usuarioActual, String emailActual) {
+        try {
+            this.sentencia = conexion.createStatement();
+            PreparedStatement ps = conexion.prepareStatement("SELECT * FROM restaurante WHERE usuario=? OR email=?;");
+
+            ps.setString(1, usuarioActual);
+            ps.setString(2, emailActual);
+            ps.setString(3, usuario);
+            ps.setString(4, email);
 
             resultset = ps.executeQuery();
 
@@ -286,40 +319,52 @@ public class ManejoDB {
     }
 
     //Editar usuario restaurante (sin contraseña)
-    public void modificarRestaurante(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String telefono) {
+    public boolean modificarRestaurante(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String telefono, String emailActual) {
         try {
             PreparedStatement ps = conexion.prepareStatement("UPDATE restaurante SET usuario=?, nombre=?, email=?, direccion=?, telefono=? WHERE usuario=?");
 
-            ps.setString(1, nuevoUsuario);
-            ps.setString(2, nombre);
-            ps.setString(3, email);
-            ps.setString(4, direccion);
-            ps.setString(5, telefono);
-            ps.setString(6, usuarioActual);
+            if (!comprobarRestauranteRepetidoActualizar(nuevoUsuario, email, usuarioActual, emailActual)) {
+                ps.setString(1, nuevoUsuario);
+                ps.setString(2, nombre);
+                ps.setString(3, email);
+                ps.setString(4, direccion);
+                ps.setString(5, telefono);
+                ps.setString(6, usuarioActual);
 
-            int resultado = ps.executeUpdate();
+                int resultado = ps.executeUpdate();
+
+                return true;
+            }
         } catch (SQLException e) {
             e.getMessage();
         }
+
+        return false;
     }
 
     //Editar usuario restaurante (con contraseña)
-    public void modificarRestauranteContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String telefono, String contrasena) {
+    public boolean modificarRestauranteContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String telefono, String contrasena, String emailActual) {
         try {
             PreparedStatement ps = conexion.prepareStatement("UPDATE restaurante SET usuario=?, nombre=?, email=?, direccion=?, telefono=?, contrasena=? WHERE usuario=?");
 
-            ps.setString(1, nuevoUsuario);
-            ps.setString(2, nombre);
-            ps.setString(3, email);
-            ps.setString(4, direccion);
-            ps.setString(5, telefono);
-            ps.setString(6, contrasena);
-            ps.setString(7, usuarioActual);
+            if (!comprobarRestauranteRepetidoActualizar(nuevoUsuario, email, usuarioActual, emailActual)) {
+                ps.setString(1, nuevoUsuario);
+                ps.setString(2, nombre);
+                ps.setString(3, email);
+                ps.setString(4, direccion);
+                ps.setString(5, telefono);
+                ps.setString(6, contrasena);
+                ps.setString(7, usuarioActual);
 
-            int resultado = ps.executeUpdate();
+                int resultado = ps.executeUpdate();
+                
+                return true;
+            }
         } catch (SQLException e) {
             e.getMessage();
         }
+        
+        return false;
     }
 
     //Obtiene todos los productos de un restautante y devuelve una lista
@@ -461,7 +506,7 @@ public class ManejoDB {
     public ArrayList<Pedido> obtenerPedidos(int idRestaurante) throws SQLException {
         ArrayList<Pedido> listaPedidos = new ArrayList<>();
 
-        PreparedStatement ps = conexion.prepareStatement("SELECT id, fecha, e.nombre AS nombreestado, precio, idCliente, idRepartidor, idRestaurante FROM pedido, estado e WHERE idRestaurante=? ORDER BY fecha DESC;");
+        PreparedStatement ps = conexion.prepareStatement("SELECT pedido.id, fecha, e.nombre AS nombreestado, precio, idCliente, idRepartidor, idRestaurante FROM pedido, estado e WHERE idRestaurante=? AND pedido.idEstado=e.id ORDER BY fecha DESC;");
 
         ps.setInt(1, idRestaurante);
         resultset = ps.executeQuery();
@@ -527,7 +572,7 @@ public class ManejoDB {
 
     public Pedido obtenerPedido(int idPedido) throws SQLException {
         this.sentencia = conexion.createStatement();
-        PreparedStatement ps = conexion.prepareStatement("SELECT p.id, p.precio, p.fecha, e.nombre AS nombreestado, p.idCliente, p.idRepartidor FROM pedido p, estado e WHERE p.id=?;");
+        PreparedStatement ps = conexion.prepareStatement("SELECT p.id, p.precio, p.fecha, e.nombre AS nombreestado, p.idCliente, p.idRepartidor FROM pedido p, estado e WHERE p.id=? AND p.idEstado=e.id;");
 
         ps.setInt(1, idPedido);
 
@@ -618,7 +663,7 @@ public class ManejoDB {
     }
 
     //Editar usuario (sin contraseña)
-    public void modificarPerfilUsuario(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String ciudad) {
+    public boolean modificarPerfilUsuario(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String ciudad) {
         try {
             PreparedStatement ps = conexion.prepareStatement("UPDATE cliente SET usuario=?, nombre=?, email=?, direccion=?, ciudad=? WHERE usuario=?");
 
@@ -630,13 +675,16 @@ public class ManejoDB {
             ps.setString(6, usuarioActual);
 
             int resultado = ps.executeUpdate();
+            
+            return true;
         } catch (SQLException e) {
             e.getMessage();
         }
+        return false;
     }
 
     //Editar usuario (con contraseña)
-    public void modificarPerfilUsuarioContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String ciudad, String contrasena) {
+    public boolean modificarPerfilUsuarioContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String direccion, String ciudad, String contrasena) {
         try {
             PreparedStatement ps = conexion.prepareStatement("UPDATE cliente SET usuario=?, nombre=?, email=?, direccion=?, ciudad=?, contrasena=? WHERE usuario=?");
 
@@ -649,9 +697,14 @@ public class ManejoDB {
             ps.setString(7, usuarioActual);
 
             int resultado = ps.executeUpdate();
+            
+            return true;
+            
         } catch (SQLException e) {
             e.getMessage();
         }
+        
+        return false;
     }
 
     //Devuelve todas las categorias para añadirlas al spinner
@@ -700,6 +753,26 @@ public class ManejoDB {
 
     //Añade una valoración
     public boolean anadirValoracion(int idRestaurante, String comentario, int puntuacion, int idCliente) {
+
+        //Comprueba que haya hecho algún pedido anteriormente
+        ArrayList<Pedido> pedidosUsuario = obtenerPedidosUsuario(idCliente);
+
+        boolean haPedido = false;
+        for (int i = 0; i < pedidosUsuario.size(); i++) {
+            try {
+                if (pedidosUsuario.get(i).getNombreRestaurante().equals(obtenerRestauranteId(idRestaurante).getNombre())) {
+                    haPedido = true;
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(ManejoDB.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+
+        if (!haPedido) {
+            return false;
+        }
+
+        //Si ha hecho algún pedido inserta la valoración
         try {
             PreparedStatement ps = conexion.prepareStatement("INSERT INTO valoracion (idRestaurante, comentario, puntuacion, idCliente) VALUES(?,?,?,?)");
 
@@ -923,7 +996,7 @@ public class ManejoDB {
     }
 
     //Editar repartidor (sin contraseña)
-    public void modificarPerfilRepartidor(String usuarioActual, String nuevoUsuario, String email, String nombre, String dni) {
+    public boolean modificarPerfilRepartidor(String usuarioActual, String nuevoUsuario, String email, String nombre, String dni) {
         try {
             PreparedStatement ps = conexion.prepareStatement("UPDATE repartidor SET usuario=?, nombre=?, email=?, dni=? WHERE usuario=?");
 
@@ -934,13 +1007,18 @@ public class ManejoDB {
             ps.setString(5, usuarioActual);
 
             int resultado = ps.executeUpdate();
+            
+            return true;
+            
         } catch (SQLException e) {
             System.out.println(e.getMessage());
         }
+        
+        return false;
     }
 
     //Editar repartidor (con contraseña)
-    public void modificarPerfilRepartidorContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String dni, String contrasena) {
+    public boolean modificarPerfilRepartidorContrasena(String usuarioActual, String nuevoUsuario, String email, String nombre, String dni, String contrasena) {
         try {
             PreparedStatement ps = conexion.prepareStatement("UPDATE repartidor SET usuario=?, nombre=?, email=?, dni=?, contrasena=? WHERE usuario=?");
 
@@ -952,9 +1030,13 @@ public class ManejoDB {
             ps.setString(6, usuarioActual);
 
             int resultado = ps.executeUpdate();
+            
+            return true;
         } catch (SQLException e) {
             e.getMessage();
         }
+        
+        return false;
     }
 
     //Actualiza el estado de un pedido
@@ -1013,6 +1095,20 @@ public class ManejoDB {
             e.getMessage();
         }
         return estado;
+    }
+
+    public void recargarUbicacion(int idUsuario, double latitud, double longitud) {
+        try {
+            PreparedStatement ps = conexion.prepareStatement("UPDATE repartidor SET latitud=?, longitud=? WHERE id=?");
+
+            ps.setDouble(1, latitud);
+            ps.setDouble(2, longitud);
+            ps.setInt(3, idUsuario);
+
+            int resultado = ps.executeUpdate();
+        } catch (SQLException e) {
+            e.getMessage();
+        }
     }
 
 }

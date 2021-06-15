@@ -12,6 +12,7 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -24,8 +25,11 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.net.SocketException;
+import java.nio.file.Files;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
@@ -50,8 +54,10 @@ public class HiloCliente extends Thread {
     private BufferedReader entrada;
     private PrintWriter salida;
     private ManejoDB manejodb;
-    // private ObjectOutputStream envioObjetos;
 
+    /* InputStream in;
+    OutputStream out;*/
+    // private ObjectOutputStream envioObjetos;
     public HiloCliente(Socket socket, Servidor servidor) {
         manejodb = new ManejoDB();
         this.socket = socket;
@@ -70,12 +76,20 @@ public class HiloCliente extends Thread {
         //try {
         // oos = new ObjectOutputStream(socket.getOutputStream());
         try {
-            String received;
+            String received="";
             String flag = "";
             String[] args;
 
             while (true) {
-                received = entrada.readLine();
+                try {
+                    received = entrada.readLine();
+                }catch(IOException e){
+                    System.out.println("Error al leer del cliente");
+                    break;
+                }catch(Exception e){
+                    System.out.println("Cliente desconectado");
+                    break;
+                }
                 args = received.split("--");
                 flag = args[0];
                 if (flag.equals(Mensajes.PETICION_LOGIN)) {
@@ -90,7 +104,7 @@ public class HiloCliente extends Thread {
                     }
                     //Registro para usuario
                 } else if (flag.equals(Mensajes.PETICION_REGISTRO)) {
-                    if (manejodb.registroUsuario(args[1], args[2], args[3], args[4], args[5])) {
+                    if (manejodb.registroUsuario(args[1], args[2], args[3], args[4], args[5], args[6])) {
                         System.out.println("Registro correcto");
                         salida.println(Mensajes.PETICION_REGISTRO_CORRECTO);
                     } else {
@@ -109,7 +123,7 @@ public class HiloCliente extends Thread {
                     }
                     //Registro del restaurante
                 } else if (flag.equals(Mensajes.PETICION_REGISTRO_RESTAURANTE)) {
-                    if (manejodb.registroRestaurante(args[1], args[2], args[3], args[4], args[5], args[6], args[7])) {
+                    if (manejodb.registroRestaurante(args[1], args[2], args[3], args[4], args[5], args[6], args[7], Integer.parseInt(args[8]))) {
                         System.out.println("Registro correcto");
                         salida.println(Mensajes.PETICION_REGISTRO_RESTAURANTE_CORRECTO);
                     } else {
@@ -118,10 +132,20 @@ public class HiloCliente extends Thread {
                     }
                     //Modificar los datos de un restaurante
                 } else if (flag.equals(Mensajes.PETICION_MODIFICAR_RESTAURANTE)) {
-                    if (args.length == 7) {
-                        manejodb.modificarRestaurante(args[1], args[2], args[3], args[4], args[5], args[6]);
-                    } else if (args.length == 8) {
-                        manejodb.modificarRestauranteContrasena(args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
+                    if (args.length == 8) {
+                        boolean modificado = manejodb.modificarRestaurante(args[1], args[2], args[3], args[4], args[5], args[6],args[7]);
+                        if (modificado) {
+                            salida.println(Mensajes.PETICION_MODIFICAR_RESTAURANTE_CORRECTO);
+                        }else{
+                            salida.println(Mensajes.PETICION_MODIFICAR_RESTAURANTE_ERROR);
+                        }
+                    } else if (args.length == 9) {
+                        boolean modificado = manejodb.modificarRestauranteContrasena(args[1], args[2], args[3], args[4], args[5], args[6], args[7],args[8]);
+                         if (modificado) {
+                            salida.println(Mensajes.PETICION_MODIFICAR_RESTAURANTE_CORRECTO);
+                        }else{
+                            salida.println(Mensajes.PETICION_MODIFICAR_RESTAURANTE_ERROR);
+                        }
                     }
                     //Mostrar la carta de un restaurante
                 } else if (flag.equals(Mensajes.PETICION_MOSTRAR_CARTA)) {
@@ -133,7 +157,7 @@ public class HiloCliente extends Thread {
                     }
                     //Añadir un producto a la carta de un restaurante
                 } else if (flag.equals(Mensajes.PETICION_ANADIR_PRODUCTO)) {
-                    String nombreImagen = leerImagen(args[1], args[2]);
+                    String nombreImagen = leerImagenAnadir(args[1], args[2]);
                     if (manejodb.anadirProducto(Integer.parseInt(args[1]), args[2], args[3], Double.parseDouble(args[4]), nombreImagen)) {
                         salida.println(Mensajes.PETICION_ANADIR_PRODUCTO_CORRECTO);
                     } else {
@@ -141,7 +165,7 @@ public class HiloCliente extends Thread {
                     }
                 } else if (flag.equals(Mensajes.PETICION_MODIFICAR_PRODUCTO)) {
                     if (args.length == 6) {
-                        String nombreImagen = leerImagen(args[1], args[2]);
+                        String nombreImagen = leerImagenAnadir(args[1], args[2]);
                         manejodb.modificarProductoConImagen(Integer.parseInt(args[1]), args[2], args[3], Double.parseDouble(args[4]), nombreImagen);
                         //COMPROBAR QUE SE AÑADE
                         salida.println(Mensajes.PETICION_MODIFICAR_PRODUCTO_CORRECTO);
@@ -199,37 +223,52 @@ public class HiloCliente extends Thread {
                     //Elimina a un repartidor de un restaurante (en la BD le deja el campo idRestaurante null)
                 } else if (flag.equals(Mensajes.PETICION_ELIMINAR_REPARTIDOR)) {
                     manejodb.eliminarRepartidor(Integer.parseInt(args[1]));
-                    //COMPROBAR QUE SE ELIMINA
                     salida.println(Mensajes.PETICION_ELIMINAR_REPARTIDOR_CORRECTO);
                 } else if (flag.equals(Mensajes.PETICION_MOSTRAR_RESTAURANTES)) {
                     ArrayList<Restaurante> listaRestaurantes = manejodb.obtenerRestaurantes();
-                    //envioObjetos = new ObjectOutputStream(socket.getOutputStream());
-                    // envioObjetos.writeObject(listaRestaurantes);
+
                     salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaRestaurantes.size());
 
                     for (int i = 0; i < listaRestaurantes.size(); i++) {
                         salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTES_CORRECTO + "--" + listaRestaurantes.get(i).getNombre() + "--" + listaRestaurantes.get(i).getEmail() + "--" + listaRestaurantes.get(i).getTelefono() + "--" + listaRestaurantes.get(i).getDireccion() + "--" + listaRestaurantes.get(i).getCiudad() + "--" + listaRestaurantes.get(i).getCategoria() + "--" + listaRestaurantes.get(i).getId());
                     }
                     //Edita la foto del producto
-                } else if (flag.equals(Mensajes.PETICION_FOTO_PRODUCTO)) {
+                    /*} else if (flag.equals(Mensajes.PETICION_FOTO_PRODUCTO)) {
                     Producto p = manejodb.obtenerProducto(Integer.parseInt(args[1]));
                     System.out.println("Imagen " + p.getImagen());
-                    enviarImagen(p.getImagen());
-                } else if (flag.equals(Mensajes.PETICION_EDITAR_PERFIL)) {
+                    enviarImagenEscritorio(p.getImagen());
+                   // enviarImagen(p.getImagen());
+                     */
+                }else if(flag.equals(Mensajes.PETICION_OBTENER_NUMERO_RESTAURANTES)){
+                     ArrayList<Restaurante> listaRestaurantes = manejodb.obtenerRestaurantes();
+                     salida.println(Mensajes.PETICION_OBTENER_NUMERO_RESTAURANTES_CORRECTO+"--"+listaRestaurantes.size());
+                }else if(flag.equals(Mensajes.PETICION_MOSTRAR_RESTAURANTE_ID)){
+                    int numRestaurante = Integer.parseInt(args[1]);
+                    ArrayList<Restaurante> listaRestaurantes = manejodb.obtenerRestaurantes();
+                    salida.println(Mensajes.PETICION_MOSTRAR_RESTAURANTE_ID_CORRECTO + "--" + listaRestaurantes.get(numRestaurante).getNombre() + "--" + listaRestaurantes.get(numRestaurante).getEmail() + "--" + listaRestaurantes.get(numRestaurante).getTelefono() + "--" + listaRestaurantes.get(numRestaurante).getDireccion() + "--" + listaRestaurantes.get(numRestaurante).getCiudad() + "--" + listaRestaurantes.get(numRestaurante).getCategoria() + "--" + listaRestaurantes.get(numRestaurante).getId());
+                }else if (flag.equals(Mensajes.PETICION_EDITAR_PERFIL)) {
+                     boolean modificado=false;
                     if (args.length == 7) {
-                        manejodb.modificarPerfilUsuario(args[1], args[2], args[3], args[4], args[5], args[6]);
+                        modificado = manejodb.modificarPerfilUsuario(args[1], args[2], args[3], args[4], args[5], args[6]);
                     } else if (args.length == 8) {
-                        manejodb.modificarPerfilUsuarioContrasena(args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
+                        modificado = manejodb.modificarPerfilUsuarioContrasena(args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
                     }
+                    
+                    if (modificado) {
+                        salida.println(Mensajes.PETICION_EDITAR_PERFIL_CORRECTO);
+                    }else{
+                        salida.println(Mensajes.PETICION_EDITAR_PERFIL_ERROR);
+                    }
+                    
                     //Envía un restaurante para abrirlo
                 } else if (flag.equals(Mensajes.PETICION_OBTENER_RESTAURANTE)) {
                     Restaurante r = manejodb.obtenerRestauranteMapa(args[1], args[2], args[3]);
                     salida.println(Mensajes.PETICION_OBTENER_RESTAURANTE_CORRECTO + "--" + r.getNombre() + "--" + r.getEmail() + "--" + r.getTelefono() + "--" + r.getDireccion() + "--" + r.getCiudad() + "--" + r.getCategoria() + "--" + r.getId());
                 } else if (flag.equals(Mensajes.PETICION_OBTENER_CATEGORIAS)) {
                     ArrayList<String> categorias = manejodb.obtenerCategorias();
-                    salida.println(Mensajes.PETICION_OBTENER_RESTAURANTE_CORRECTO + "--" + categorias.size());
+                    salida.println(Mensajes.PETICION_OBTENER_CATEGORIAS_CORRECTO + "--" + categorias.size());
                     for (int i = 0; i < categorias.size(); i++) {
-                        salida.println(Mensajes.PETICION_OBTENER_RESTAURANTE_CORRECTO + "--" + categorias.get(i));
+                        salida.println(Mensajes.PETICION_OBTENER_CATEGORIAS_CORRECTO + "--" + categorias.get(i));
                     }
 
                 } else if (flag.equals(Mensajes.PETICION_MOSTRAR_VALORACIONES)) {
@@ -239,8 +278,14 @@ public class HiloCliente extends Thread {
                         salida.println(Mensajes.PETICION_MOSTRAR_VALORACIONES_CORRECTO + "--" + valoraciones.get(i).getId() + "--" + valoraciones.get(i).getComentario() + "--" + valoraciones.get(i).getNota() + "--" + valoraciones.get(i).getIdCliente());
                     }
                 } else if (flag.equals(Mensajes.PETICION_ANADIR_VALORACION)) {
-                    manejodb.anadirValoracion(Integer.parseInt(args[1]), args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]));
-                    salida.println(Mensajes.PETICION_ANADIR_VALORACION_CORRECTO);
+                    boolean insertado = manejodb.anadirValoracion(Integer.parseInt(args[1]), args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]));
+                    if (insertado) {
+                        salida.println(Mensajes.PETICION_ANADIR_VALORACION_CORRECTO);
+
+                    } else {
+                        salida.println(Mensajes.PETICION_ANADIR_VALORACION_ERROR);
+
+                    }
                 } else if (flag.equals(Mensajes.PETICION_REALIZAR_PEDIDO)) {
                     int idPedido = manejodb.anadirPedido(Double.parseDouble(args[1]), args[2], Integer.parseInt(args[3]), Integer.parseInt(args[4]));
                     String[] idProductos = args[5].split("/");
@@ -287,11 +332,19 @@ public class HiloCliente extends Thread {
                     }
                     //Edita el perfil del repartidor
                 } else if (flag.equals(Mensajes.PETICION_EDITAR_PERFIL_REPARTIDOR)) {
+                    boolean modificado = false;
                     if (args.length == 6) {
-                        manejodb.modificarPerfilRepartidor(args[1], args[2], args[3], args[4], args[5]);
+                        modificado = manejodb.modificarPerfilRepartidor(args[1], args[2], args[3], args[4], args[5]);
                     } else if (args.length == 7) {
-                        manejodb.modificarPerfilRepartidorContrasena(args[1], args[2], args[3], args[4], args[5], args[6]);
+                        modificado = manejodb.modificarPerfilRepartidorContrasena(args[1], args[2], args[3], args[4], args[5], args[6]);
                     }
+                    
+                    if (modificado) {
+                        salida.println(Mensajes.PETICION_EDITAR_PERFIL_REPARTIDOR_CORRECTO);
+                    }else{
+                        salida.println(Mensajes.PETICION_EDITAR_PERFIL_REPARTIDOR_ERROR);
+                    }
+                    
                     //Envía la lista de pedidos de un repartidor (devuelve dirección del cliente también)
                 } else if (flag.equals(Mensajes.PETICION_MOSTRAR_PEDIDOS_REPARTIDOR)) {
                     ArrayList<Pedido> listaPedidos = manejodb.obtenerPedidosRepartidor(Integer.parseInt(args[1]));
@@ -316,14 +369,19 @@ public class HiloCliente extends Thread {
 
                     salida.println(Mensajes.PETICION_OBTENER_ESTADOS_CORRECTO + "--" + estados.size());
                     for (int i = 0; i < estados.size(); i++) {
-                        salida.println(Mensajes.PETICION_OBTENER_ESTADOS_CORRECTO +"--"+ estados.get(i));
+                        salida.println(Mensajes.PETICION_OBTENER_ESTADOS_CORRECTO + "--" + estados.get(i));
                     }
+                } else if (flag.equals(Mensajes.PETICION_RECARGAR_UBICACION)) {
+                    manejodb.recargarUbicacion(Integer.parseInt(args[1]), Double.parseDouble(args[2]), Double.parseDouble(args[3]));
+                } else if (flag.equals(Mensajes.PETICION_RESTAURANTE_REPARTIDOR)) {
+                    Repartidor r = manejodb.obtenerRepartidorNombre(args[1]);
+                    salida.println(Mensajes.PETICION_RESTAURANTE_REPARTIDOR_CORRECTO+"--"+r.getRestaurante());
                 }
 
             }
-        } catch (IOException ex) {
+        }/* catch (IOException ex) {
             Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (SQLException ex) {
+        }*/ catch (SQLException ex) {
             Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
         } catch (NullPointerException ex) {
             System.out.println("Cliente desconectado.");
@@ -333,6 +391,8 @@ public class HiloCliente extends Thread {
             } catch (IOException ex1) {
                 Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex1);
             }
+        } catch (Exception e) {
+            System.out.println("Cliente desconectado");
         }
     }
 
@@ -362,27 +422,54 @@ public class HiloCliente extends Thread {
             } while (count == 8096);
 
             out.close();
-            /*in.close();*/
+            //in.close();
         } catch (IOException ex) {
             Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
         }
         return nombreImagen;
     }
 
-    public void enviarImagen(String imagen) {
-        FileInputStream in = null;
+    public String leerImagenAnadir(String idRestaurante, String nombreProducto) {
+        InputStream is = null;
+        String nombreImagen = nombreProducto + idRestaurante + ".jpg";
+
         try {
-            byte[] bytes = new byte[8096];
-            System.out.println(imagen);
-            in = new FileInputStream("E:\\manuel\\Documents\\DAM\\2 DAM 2020\\Proyecto\\Servidor\\imagenescomida\\" + imagen);
+            is = socket.getInputStream();
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            //Lee la imagen del servidor y la guarda en un fichero (se sobreescribe cada vez que llega una nueva)
+            String cadena = br.readLine();
+            byte[] decodedString = Base64.getDecoder().decode(cadena);
+            File imagen = new File(".\\imagenescomida\\" + nombreImagen);
+            FileOutputStream out = new FileOutputStream(imagen);
+            out.write(decodedString);
+            out.close();
+        } catch (IOException ex) {
+            Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
+        } finally {
+        }
+        return nombreImagen;
+
+    }
+
+    public void enviarImagen(String imagen) {
+        /*FileInputStream  in = null;*/
+        try {
+            /*   byte[] bytes = new byte[8096];
+            System.out.println(imagen);*/
+            File in = new File("E:\\manuel\\Documents\\DAM\\2 DAM 2020\\Proyecto\\Servidor\\imagenescomida\\" + imagen);
             OutputStream out = socket.getOutputStream();
-            int count;
+            /*  int count;
             do {
                 count = in.read(bytes);
+                System.out.println("Count: " + count);
                 out.write(bytes, 0, count);
-            } while (count == 8096);
-
-            in.close();
+            } while (count == 8096);*/
+            PrintWriter dos = new PrintWriter(out);
+            String encode = Base64.getEncoder().encodeToString(Files.readAllBytes(in.toPath()));
+            dos.println(encode);
+            dos.flush();
+            //in.close();
+            //out.close();
 
         } catch (FileNotFoundException ex) {
             Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
@@ -390,4 +477,26 @@ public class HiloCliente extends Thread {
             Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
+
+    /*public void enviarImagenEscritorio(String imagen) {
+        FileInputStream  in = null;
+        try {
+            byte[] bytes = new byte[8096];
+             in = new FileInputStream("E:\\manuel\\Documents\\DAM\\2 DAM 2020\\Proyecto\\Servidor\\imagenescomida\\" + imagen);
+            OutputStream out = socket.getOutputStream();
+            int count;
+            do {
+                count = in.read(bytes);
+                System.out.println("Count: " + count);
+                out.write(bytes, 0, count);
+            } while (count == 8096);
+           in.close();
+            //out.close();
+
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(HiloCliente.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }*/
 }
